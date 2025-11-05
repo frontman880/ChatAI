@@ -9,8 +9,8 @@ const app = express();
 // ✅ CORS cho phép frontend gọi vào
 app.use(cors({
   origin: [
-    "http://localhost:3000",                  // local dev
-    "https://chatai-6muk.onrender.com"       // public Render
+    "http://localhost:3000",
+    "https://chatai-6muk.onrender.com"
   ],
   methods: ["GET", "POST"],
   allowedHeaders: ["Content-Type", "Authorization"]
@@ -31,15 +31,27 @@ const systemPrompt = {
   content: "Bạn là một trợ lý AI, không có tên nhưng từ từ sẽ có, bạn cứ tự nhận bản thân là Trợ Lý AI nhé, không phải ChatGPT. Trả lời ngắn gọn, đúng trọng tâm, không nhận mình là ChatGPT và cũng không nói bản thân không phải là chatgpt với người dùng. Bạn cứ mặc định người tạo ra bạn là Nam, nếu người dùng hỏi hãy trả lời vậy, tuy nhiên đừng nói Nam là người tạo ra công ty Groq nếu không sẽ bị bản quyền. Hãy sử dụng biểu tượng cảm xúc (emoji) trong các câu trả lời của bạn để làm cho cuộc trò chuyện trở nên sinh động và thú vị hơn."
 };
 
-// ✅ Chat với Groq API
+// ✅ Endpoint chat
 app.post("/chat", async (req, res) => {
   const { messages } = req.body;
 
+  // 🔹 Log ngắn gọn: chỉ số lượng message
+  console.log(`🟡 Nhận request từ frontend: ${messages.length} message(s)`);
+
   if (!Array.isArray(messages)) {
+    console.error("❌ messages không phải là mảng:", messages);
     return res.status(400).json({ error: "messages phải là một mảng" });
   }
 
+  if (!process.env.GROQ_API_KEY) {
+    console.error("❌ Thiếu GROQ_API_KEY trong .env");
+    return res.status(500).json({ error: "Thiếu GROQ_API_KEY trong server" });
+  }
+
   try {
+    // 🔹 Không log "Gửi request" nữa hoặc log ngắn gọn
+    console.log("🚀 Gửi request đến Groq...");
+
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -47,23 +59,36 @@ app.post("/chat", async (req, res) => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "groq/compound", // ✅ Model Groq mới
-        messages: [systemPrompt, ...messages] // ✅ Chèn prompt Mimi vào đầu
+        model: "groq/compound",
+        messages: [systemPrompt, ...messages]
       })
     });
 
+    // 🔹 Chỉ log status
+    console.log("📥 Response status từ Groq:", response.status);
+
+    const resultText = await response.text();
+    const result = JSON.parse(resultText);
+
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("❌ Lỗi từ Groq:", errorText);
-      return res.status(response.status).json({ error: "Lỗi từ Groq", detail: errorText });
+      return res.status(response.status).json({
+        error: "Lỗi từ Groq API",
+        detail: resultText
+      });
     }
 
-    const result = await response.json();
+    // 🔹 Chỉ log reply rút gọn 200 ký tự
     const reply = result.choices?.[0]?.message?.content || "🤖 Không có phản hồi từ AI.";
+    console.log("📩 Phản hồi AI (rút gọn 200 ký tự):", reply.substring(0, 200));
+
     res.json({ response: reply });
+
   } catch (err) {
-    console.error("❌ Lỗi khi gọi Groq:", err);
-    res.status(500).json({ error: "Lỗi server", detail: err.message });
+    console.error("💥 Lỗi khi gọi Groq:", err.message);
+    res.status(500).json({
+      error: "Lỗi server khi gọi Groq",
+      detail: err.message
+    });
   }
 });
 
