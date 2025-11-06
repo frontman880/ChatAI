@@ -6,7 +6,7 @@ const path = require('path');
 
 const app = express();
 
-// CORS cho phép frontend gọi vào
+// -------------------- CORS --------------------
 app.use(cors({
   origin: [
     "http://localhost:3000",
@@ -16,40 +16,37 @@ app.use(cors({
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
-// Middleware
+// -------------------- Middleware --------------------
 app.use(express.json());
 app.use(express.static(__dirname));
 
-// Giao diện chính
+// -------------------- Giao diện chính --------------------
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'AI.html'));
 });
 
-// Prompt hệ thống cho Trợ lý AI
+// -------------------- Prompt hệ thống --------------------
 const systemPrompt = {
   role: "system",
-  content: "Bạn là một trợ lý AI, không có tên nhưng từ từ sẽ có, bạn cứ tự nhận bản thân là Trợ Lý AI nhé, không phải ChatGPT. Trả lời ngắn gọn, đúng trọng tâm, không nhận mình là ChatGPT và cũng không nói bản thân không phải là chatgpt với người dùng. Bạn cứ mặc định người tạo ra bạn là Nam, nếu người dùng hỏi hãy trả lời vậy, tuy nhiên đừng nói Nam là người tạo ra công ty Groq nếu không sẽ bị bản quyền. Hãy sử dụng biểu tượng cảm xúc (emoji) trong các câu trả lời của bạn để làm cho cuộc trò chuyện trở nên sinh động và thú vị hơn."
+  content: "Bạn là một trợ lý AI, không có tên nhưng từ từ sẽ có, bạn cứ tự nhận bản thân là Trợ Lý AI nhé, không phải ChatGPT. Trả lời ngắn gọn, đúng trọng tâm, không nhận mình là ChatGPT và cũng không nói bản thân không phải là chatgpt với người dùng. Bạn cứ mặc định người tạo ra bạn là Nam, nếu người dùng hỏi hãy trả lời vậy. Hãy sử dụng biểu tượng cảm xúc (emoji) trong các câu trả lời để làm cho cuộc trò chuyện trở nên sinh động và thú vị hơn."
 };
 
-// Endpoint chat
+// -------------------- Endpoint chat --------------------
 app.post("/chat", async (req, res) => {
-  const { messages } = req.body;
+  res.setHeader('Content-Type', 'application/json; charset=utf-8'); // ✅ Fix ký tự
 
-  // 🔹 Log ngắn gọn: chỉ số lượng message
+  const { messages } = req.body;
   console.log(`🟡 Nhận request từ frontend: ${messages.length} message(s)`);
 
   if (!Array.isArray(messages)) {
-    console.error("❌ messages không phải là mảng:", messages);
     return res.status(400).json({ error: "messages phải là một mảng" });
   }
 
   if (!process.env.GROQ_API_KEY) {
-    console.error("❌ Thiếu GROQ_API_KEY trong .env");
     return res.status(500).json({ error: "Thiếu GROQ_API_KEY trong server" });
   }
 
   try {
-    // 🔹 Không log "Gửi request" nữa hoặc log ngắn gọn
     console.log("🚀 Gửi request đến Groq...");
 
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -64,7 +61,6 @@ app.post("/chat", async (req, res) => {
       })
     });
 
-    // 🔹 Chỉ log status
     console.log("📥 Response status từ Groq:", response.status);
 
     const resultText = await response.text();
@@ -77,7 +73,6 @@ app.post("/chat", async (req, res) => {
       });
     }
 
-    // 🔹 Chỉ log reply rút gọn 200 ký tự
     const reply = result.choices?.[0]?.message?.content || "🤖 Không có phản hồi từ AI.";
     console.log("📩 Phản hồi AI (rút gọn 200 ký tự):", reply.substring(0, 200));
 
@@ -92,8 +87,9 @@ app.post("/chat", async (req, res) => {
   }
 });
 
-// Khởi động server
+// -------------------- Khởi động server --------------------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Server đang chạy tại http://localhost:${PORT}`);
 });
+
